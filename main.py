@@ -42,4 +42,15 @@ def main(args):
 
     data_loader = trainloader(transform=transform)
     optimizer = torch.optim.SGD(params=params, lr=args.lr, momentum=0.9)
-    
+
+   train_steps = math.ceil()
+   epoch = 0
+
+   while epoch <= args.n_epochs:
+       # Create training script in train.py
+       # Create validation script
+       # Create testing script
+        pass
+
+
+   pass
