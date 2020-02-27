@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
 import torch.nn.functional as F
 import torchvision.models as imagemodels
 
@@ -46,9 +45,8 @@ class DecoderRNN(nn.Module):
         self.fc1 = nn.Linear(self.hidden_features, intermediate_features)
         self.fc2 = nn.Linear(intermediate_features, 1)
 
-
     def forward(self, x_seq):
-        
+
         self.LSTM.flatten_parameters()
         LSTM_out, (h_n, h_c) = self.LSTM(x_seq, None)
 
