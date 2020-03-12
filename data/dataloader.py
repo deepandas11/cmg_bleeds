@@ -9,38 +9,39 @@ class trainloader(Dataset):
     def __init__(
         self,
         transform,
-        base_path='../data/',
-        meta_file='bbx_data/data_aug.json'
+        mode="train",
+        base_path='../../data/',
+        dataset='/home/deepandas11/computer/servers/gcp/bleeds/data/Data/DataSet13_20200221/raw_patient_based',
     ):
-
-        self.base_path = base_path
-        self.meta_path = os.path.join(self.base_path, meta_file)
-
-        self.meta_data = json.load(open(self.meta_path))
-        self.patient_ids = list(self.meta_data.keys())
-
+        if mode == 'train':
+            self.data_path = os.path.join(dataset, "Training")
+            self.meta_path = os.path.join(dataset, 'train_meta.json')
+        else:
+            self.data_path = os.path.join(dataset, "Testing")
+            self.meta_path = os.path.join(dataset, 'test_meta.json')
+        self.meta_data = json.load(open(self.meta_path, 'r'))
+        self.indexes = list(self.meta_data.keys())
         self.transform = transform
 
-
     def __getitem__(self, index):
-        assert index <= len(self.patient_ids)
-        patient_id = self.patient_ids[index]
+        assert index <= len(self.indexes)
+        pid = self.indexes[index]
+        id_data = self.meta_data[pid]
 
         image_stack = []
-        label_stack = []
-        for frame in self.meta_data[patient_id]:
-            frame_data = self.meta_data[patient_id][frame]
-            image_path = os.path.join(self.base_path, frame_data['img_path'])
+        label = id_data["seq_label"]
+
+        for frame in id_data["sequence"]:
+            # rel_path = os.path.join(self.data_path, id_data["sequence"][frame])
+            image_path = self.data_path + id_data["sequence"][frame]
+            print("hey ho", image_path)
             image = Image.open(image_path).convert("RGB")
             image = self.transform(image)
-            frame_label = frame_data['label']
-
             image_stack.append(image)
-            label_stack.append(frame_label)
 
         image_stack = torch.stack(image_stack, dim=0)
 
-        return image_stack, label_stack
+        return image_stack, label
 
     def __len__(self):
-        return len(self.patient_ids)
+        return len(self.indexes)
