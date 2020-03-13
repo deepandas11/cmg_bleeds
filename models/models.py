@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import torchvision.models as imagemodels
 
 
+
 class EncoderCNN(nn.Module):
     def __init__(self, pretrained=True, remove_layers=1):
         super(EncoderCNN, self).__init__()
@@ -17,8 +18,9 @@ class EncoderCNN(nn.Module):
 
     def forward(self, x_3d):
         cnn_embed_seq = []
-        for frame_num in range(x_3d.size(1)):
-            x = self.pretrained_model(x_3d[:, frame_num, :, :, :])
+        for frame_num in range(x_3d.size(0)):
+            img_consider = x_3d[frame_num, :, :, :].unsqueeze(0)
+            x = self.pretrained_model(img_consider)
             x = x.view(x.size(0), -1)
 
             cnn_embed_seq.append(x)
