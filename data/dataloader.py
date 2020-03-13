@@ -40,6 +40,7 @@ class DataLoader(Dataset):
             image_stack.append(image)
 
         image_stack = torch.stack(image_stack, dim=0)
+        label = torch.Tensor([label]).unsqueeze(0)
 
         return image_stack, label
 
