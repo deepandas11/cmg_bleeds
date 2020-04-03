@@ -1,5 +1,6 @@
 import torch
-import numpy as np
+import os
+import shutil
 
 
 class AverageMeter(object):
@@ -33,7 +34,7 @@ def get_lr(optimizer):
 
 
 def save_checkpoint(state, is_best, dir_name, filename='checkpoint.pth.tar'):
-    directory = "../runs/%s/" % (dir_name)
+    directory = "runs/%s/" % (dir_name)
 
     if not os.path.exists(directory):
         os.makedirs(directory)
@@ -44,8 +45,7 @@ def save_checkpoint(state, is_best, dir_name, filename='checkpoint.pth.tar'):
 
     if is_best:
         print("Best Model found ! ")
-        shutil.copyfile(filename, 'runs/%s/' %
-                        (args.name) + 'model_best.pth.tar')
+        shutil.copyfile(filename, directory + '/model_best.pth.tar')
 
 
 def load_checkpoint(encoder, decoder, resume_filename):
@@ -73,3 +73,4 @@ def load_checkpoint(encoder, decoder, resume_filename):
             print(" => No checkpoint found at '{}'".format(resume_filename))
 
     return start_epoch, best_loss
+  

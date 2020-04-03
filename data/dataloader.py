@@ -11,7 +11,7 @@ class DataLoader(Dataset):
         self,
         transform,
         mode="train",
-        dataset_path='../../data/Data/DataSet13_20200221/raw_patient_based',
+        dataset_path='/srv/home/deepandas11/bleeds/data/Data/DataSet13_20200221/raw_patient_based',
     ):
         if mode == 'train':
             self.data_path = os.path.join(dataset_path, "Training")

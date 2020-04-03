@@ -7,7 +7,7 @@ import torch.utils.data as data
 from tensorboardX import SummaryWriter
 from torch.nn import MSELoss
 
-writer = SummaryWriter('../logs')
+writer = SummaryWriter('logs/')
 
 from utils.utils import AverageMeter
 
@@ -25,6 +25,7 @@ def train(data_loader_train, encoder, decoder, optimizer, epoch,
     # Randomly Shuffled Dataset Indices
     indices = data_loader_train.get_indices()
     total_steps = len(indices)
+    # total_steps = 5
 
     # Loss Scores Record
     loss_scores = list()
@@ -79,16 +80,17 @@ def validate(encoder, decoder, data_loader_val, epoch, use_gpu):
 
     indices = data_loader_val.get_indices()
     total_steps = len(indices)
+    # total_steps = 5
 
     # Loss Scores Record
     loss_scores = list()
     for index in range(total_steps):
         d_index = indices[index]
 
-        img_sequence, label = data_loader_train[d_index]
+        img_sequence, label = data_loader_val[d_index]
 
         img_sequence = img_sequence.to(device)
-        label = label.to(deice)
+        label = label.to(device)
         
         with torch.no_grad():
             seq_op = encoder(img_sequence)
@@ -96,7 +98,7 @@ def validate(encoder, decoder, data_loader_val, epoch, use_gpu):
 
             loss = _mse_loss(pred, label)
             loss_scores.append(loss)
-            total_val_loss += loss.data[0]
+            total_val_loss += loss.data
 
         val_losses.update(loss.item())
         niter =  epoch * total_steps + index

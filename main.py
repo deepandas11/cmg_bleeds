@@ -15,18 +15,20 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 parser.add_argument('--lr', default=0.001, type=float)
-parser.add_argument('--n_epochs', default=10)
+parser.add_argument('--n_epochs', default=100)
 parser.add_argument('-b', default=1)
 parser.add_argument('--gpu', default=False)
-parser.add_argument('--name', default="DefaultRun")
+parser.add_argument('--name', default="NaiveModel")
 parser.add_argument('--resume', default='')
 
-_DATASET_PATH = '../data/Data/DataSet13_20200221/raw_patient_based'
+_DATASET_PATH = '/srv/home/deepandas11/bleeds/data/Data/DataSet13_20200221/raw_patient_based'
+
+
 def main(args):
 
     print("Process %s, running on %s: starting (%s)" % (
         os.getpid(), os.name, time.asctime()))
-
+    process_num = round(time.time())
     use_gpu = args.gpu
     if not torch.cuda.is_available():
         use_gpu = False
@@ -49,10 +51,13 @@ def main(args):
         transforms.Normalize((0.485, 0.456, 0.406),
                              (0.229, 0.224, 0.225))])
 
-    train_loader = DataLoader(transform=transform, mode="train", dataset_path=_DATASET_PATH)
-    val_loader = DataLoader(transform=transform, mode="val", dataset_path=_DATASET_PATH)
+    train_loader = DataLoader(
+        transform=transform, mode="train", dataset_path=_DATASET_PATH)
+    val_loader = DataLoader(transform=transform,
+                            mode="val", dataset_path=_DATASET_PATH)
 
-    start_epoch, best_loss = utils.load_checkpoint(encoder, decoder, args.resume)
+    start_epoch, best_loss = utils.load_checkpoint(
+        encoder, decoder, args.resume)
 
     optimizer = torch.optim.SGD(params=params, lr=args.lr, momentum=0.9)
 
@@ -68,32 +73,34 @@ def main(args):
         print("Learning Rate : ", utils.get_lr(optimizer))
 
         train_loss = train.train(train_loader, encoder, decoder,
-                           optimizer, epoch, use_gpu)
+                                 optimizer, epoch, use_gpu)
         val_loss = train.validate(encoder, decoder, val_loader, epoch, use_gpu)
 
         print("Training Loss: ", float(train_loss.data))
         print("Validation Loss: ", float(val_loss.data))
         print("========================================================")
 
+        curr_state = state = {
+            "epoch": epoch,
+            "best_loss": min(best_loss, val_loss),
+            "encoder": encoder.state_dict(),
+            "decoder": decoder.state_dict()
+        }
+        dir_name = str(process_num) + '_' + args.name
         utils.save_checkpoint(
-            {
-                "epoch": epoch,
-                "best_loss": min(best_loss, val_loss),
-                "encoder": encoder.state_dict(),
-                "decoder": decoder.state_dict()
-            },
-            val_loss < best_loss,
-            best_epoch=epoch,
-            best_loss=val_loss,
-            dir_name=args.name
+            curr_state,
+            is_best=val_loss < best_loss,
+            # best_epoch=epoch,
+            # best_loss=val_loss,
+            dir_name=dir_name,
         )
         if val_loss < best_loss:
-          best_epoch = epoch
-          best_loss = val_loss
+            best_epoch = epoch
+            best_loss = val_loss
 
         epoch += 1
 
 
 if __name__ == "__main__":
-  args = parser.parse_args()
-  main(args)
+    args = parser.parse_args()
+    main(args)
