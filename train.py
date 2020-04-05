@@ -1,11 +1,11 @@
 import time
 import torch
-import numpy as np
-import math
-from statistics import mean
-import torch.utils.data as data
+# import numpy as np
+# import math
+# from statistics import mean
+# import torch.utils.data as data
 from tensorboardX import SummaryWriter
-from torch.nn import MSELoss
+from torch.autograd import Variable
 
 writer = SummaryWriter('logs/')
 
@@ -13,6 +13,7 @@ from utils.utils import AverageMeter
 
 
 _mse_loss = torch.nn.MSELoss()
+_criterion = torch.nn.BCELoss()  
 
 def train(data_loader_train, encoder, decoder, optimizer, epoch,
           use_gpu=False, start_loss=0.0):
@@ -20,15 +21,10 @@ def train(data_loader_train, encoder, decoder, optimizer, epoch,
     losses = AverageMeter()
     total_loss = start_loss
 
-    start_time = time.time()
-
     # Randomly Shuffled Dataset Indices
     indices = data_loader_train.get_indices()
     total_steps = len(indices)
     # total_steps = 5
-
-    # Loss Scores Record
-    loss_scores = list()
 
     # Training with Batch Size 1
     for index in range(total_steps):
@@ -44,9 +40,12 @@ def train(data_loader_train, encoder, decoder, optimizer, epoch,
             img_sequence = img_sequence.cuda()
             label = label.cuda()
 
+        img_sequence, label = map(Variable, (img_sequence, label))
+
         seq_op = encoder(img_sequence)
         pred = decoder(seq_op)
-        loss = _mse_loss(pred, label)
+        # loss = _mse_loss(pred, label)
+        loss = _criterion(pred, label)
 
         optimizer.zero_grad()
         total_loss += loss.data
@@ -59,8 +58,6 @@ def train(data_loader_train, encoder, decoder, optimizer, epoch,
 
         print("Step: %d, Current Loss: %0.4f, Average Loss: %0.4f" %
               (index, loss, total_loss))
-
-    time_taken = time.time() - start_time
 
     return total_loss/total_steps
 
