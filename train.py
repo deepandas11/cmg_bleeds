@@ -6,12 +6,14 @@ from statistics import mean
 import torch.utils.data as data
 from tensorboardX import SummaryWriter
 from torch.nn import MSELoss
+from imgaug import argumeners as iaa
+import imgaug as ia
 
 writer = SummaryWriter('logs/')
 
 from utils.utils import AverageMeter
 
-
+ia.seed(1)
 _mse_loss = torch.nn.MSELoss()
 
 def train(data_loader_train, encoder, decoder, optimizer, epoch,
@@ -30,6 +32,13 @@ def train(data_loader_train, encoder, decoder, optimizer, epoch,
     # Loss Scores Record
     loss_scores = list()
 
+    #data argumentation
+    seq = iaa.Sequential([
+            iaa.AdditiveGaussianNoise(loc=0,scale=(0.0, 0.01 * 255),per_channel=0.5),
+            iaa.GaussianBlur(sigma=(0, 3)),
+            iaa.Multiply((1.2, 1.5))  #brightness
+    ])
+
     # Training with Batch Size 1
     for index in range(total_steps):
         # Fetch actual data index
@@ -39,7 +48,10 @@ def train(data_loader_train, encoder, decoder, optimizer, epoch,
         decoder.train()
 
         img_sequence, label = data_loader_train[d_index]
-
+        
+        #apply data aug
+        img_sequence = seq(images = img_sequence)
+        
         if torch.cuda.is_available() and use_gpu:
             img_sequence = img_sequence.cuda()
             label = label.cuda()
