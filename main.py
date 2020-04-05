@@ -1,15 +1,16 @@
 import os
 import time
 import torch
-from torchvision import transforms
 import math
 import argparse
-import shutil
-
+import socket
+from torchvision import transforms
+import torch.backends.cudnn as cudnn
 from data.dataloader import DataLoader
 from models.models import EncoderCNN, DecoderRNN
 from utils import utils
 import train
+
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -20,9 +21,6 @@ parser.add_argument('-b', default=1)
 parser.add_argument('--gpu', default=False)
 parser.add_argument('--name', default="NaiveModel")
 parser.add_argument('--resume', default='')
-
-_DATASET_PATH = '/srv/home/deepandas11/bleeds/data/Data/DataSet13_20200221/raw_patient_based'
-
 
 def main(args):
 
@@ -37,6 +35,7 @@ def main(args):
     decoder = DecoderRNN()
 
     if torch.cuda.is_available() and args.gpu:
+        cudnn.benchmark = True
         encoder = encoder.cuda()
         decoder = decoder.cuda()
 
@@ -45,11 +44,18 @@ def main(args):
 
     params = encoder_trainables + decoder_trainables
 
+    # transform = transforms.Compose([
+    #     transforms.Resize((224, 224)),
+    #     transforms.ToTensor(),
+    #     transforms.Normalize((0.485, 0.456, 0.406),
+    #                          (0.229, 0.224, 0.225))])
+
     transform = transforms.Compose([
-        transforms.Resize((224, 224)),
+        transforms.RandomCrop(32, padding=4),
+        transforms.RandomHorizontalFlip(),  # randomly flip image horizontally
         transforms.ToTensor(),
-        transforms.Normalize((0.485, 0.456, 0.406),
-                             (0.229, 0.224, 0.225))])
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261))])
+
 
     train_loader = DataLoader(
         transform=transform, mode="train", dataset_path=_DATASET_PATH)
@@ -103,4 +109,10 @@ def main(args):
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    main(args)
+    if socket.gethostname() == 'eru':
+        _DATASET_PATH = '/home/deepandas11/computer/servers/euler/data/Data/DataSet13_20200221/raw_patient_based'
+    elif socket.gethostname() == 'euler.wacc.wisc.edu':
+        _DATASET_PATH = '/srv/home/deepandas11/bleeds/data/Data/DataSet13_20200221/raw_patient_based'
+    else:
+        _DATASET_PATH = '/home/data/'
+    main(args)  
