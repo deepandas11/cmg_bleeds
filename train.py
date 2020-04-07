@@ -1,18 +1,19 @@
 import time
 import torch
 from torch.autograd import Variable
-from utils.utils import AverageMeter
+from utils.utils import AverageMeter, find_metrics
 
 
 
 
-def train(data_loader, encoder, decoder, optimizer, loss_fn, epoch, writer,
+def train(data_loader, encoder, decoder, optimizer, loss_fn, metrics_fn, epoch, writer,
           use_gpu=False):
 
     encoder.train()
     decoder.train()
 
     losses = AverageMeter()
+    accuracies = AverageMeter()
     epoch_steps = len(data_loader)
 
     for i, (train_batch, label_batch) in enumerate(data_loader):
@@ -28,26 +29,39 @@ def train(data_loader, encoder, decoder, optimizer, loss_fn, epoch, writer,
 
         loss = loss_fn(output_batch, label_batch)
         losses.update(loss.item())
-        writer.add_scalar('data/stepwise_training_loss', losses.val, niter)
 
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
+        acc_score, prec, rec = metrics_fn(output_batch, label_batch)
+        accuracies.update(acc_score)
+
+        writer.add_scalar('data/stepwise_training_loss', losses.val, niter)
+        writer.add_scalar('data/stepwise_training_accuracy', accuracies.val, niter)
+
         print("Step: %d, Current Loss: %0.4f, Average Loss: %0.4f" %
               (i, loss, losses.avg))
 
+
     writer.add_scalar('data/training_loss', losses.avg, epoch)
+    writer.add_scalar('data/training_accuracy', accuracies.avg, epoch)
     return losses.avg
 
 
 
-def validate(data_loader, encoder, decoder, loss_fn, epoch, writer, use_gpu=False):
+def validate(data_loader, encoder, decoder, loss_fn, metrics_fn, epoch, writer, use_gpu=False):
 
     encoder.eval()
     decoder.eval()
 
     losses = AverageMeter()
+    accuracies = AverageMeter()
+    bleeding_precs = AverageMeter()
+    bleeding_recs = AverageMeter()
+    healthy_precs = AverageMeter()
+    healthy_recs = AverageMeter()
+
     epoch_steps = len(data_loader)
 
     for i, (train_batch, label_batch) in enumerate(data_loader):
@@ -63,7 +77,16 @@ def validate(data_loader, encoder, decoder, loss_fn, epoch, writer, use_gpu=Fals
 
             loss = loss_fn(output_batch, label_batch)
             losses.update(loss.item())
-            
+
+            acc_score, prec, rec = metrics_fn(output_batch, label_batch)
+
+            accuracies.update(acc_score)
+            healthy_precs.update(prec[0])
+            healthy_recs.update(rec[0])
+            bleeding_precs.update(prec[1])
+            bleeding_recs.update(prec[0])
+
+
             writer.add_scalar('data/stepwise_val_loss', losses.val, niter)
 
 
@@ -71,6 +94,11 @@ def validate(data_loader, encoder, decoder, loss_fn, epoch, writer, use_gpu=Fals
               (i, loss, losses.avg))
 
     writer.add_scalar('data/val_loss', losses.avg, epoch)
+    writer.add_scalar('data/val_accuracy', accuracies.avg, epoch)
+    writer.add_scalar('data/val_healthy_precision', healthy_precs.avg, epoch)
+    writer.add_scalar('data/val_healthy_recall', healthy_recs.avg, epoch)
+    writer.add_scalar('data/val_bleeding_precision',bleeding_precs.avg, epoch)
+    writer.add_scalar('data/val_bleeding_recall', bleeding_recs.avg, epoch)
     return losses.avg
 
 

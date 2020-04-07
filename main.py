@@ -16,13 +16,15 @@ import train
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-parser.add_argument('--lr', default=0.001, type=float)
+parser.add_argument('--lr', default=0.1, type=float)
 parser.add_argument('--n_epochs', default=100)
 parser.add_argument('--batch_size', default=8)
 parser.add_argument('--gpu', default=False)
-parser.add_argument('--name', default="NaiveModel")
 parser.add_argument('--resume', default='')
 parser.add_argument('--loss_fn', default='bce')
+parser.add_argument('--upsample', default=True)
+parser.add_argument('--pretrained', default=False)
+parser.add_argument('--name', default="upsample")
 
 
 def main(args):
@@ -38,7 +40,7 @@ def main(args):
     if not torch.cuda.is_available():
         use_gpu = False
 
-    encoder = EncoderCNN()
+    encoder = EncoderCNN(pretrained=args.pretrained)
     decoder = DecoderLSTM()
 
     if args.gpu:
@@ -56,9 +58,14 @@ def main(args):
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261))])
 
+    val_transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261))])
+
     train_dataset = BleedsDataset(
-        transform=transform, mode="train", dataset_path=_DATASET_PATH)
-    val_dataset = BleedsDataset(transform=transform,
+        transform=transform, mode="train", dataset_path=_DATASET_PATH, batch_size=8, upsample=args.upsample)
+    val_dataset = BleedsDataset(transform=val_transform,
                                 mode="val", dataset_path=_DATASET_PATH)
 
     train_loader = get_loader(
@@ -76,6 +83,7 @@ def main(args):
         loss_fn = torch.nn.MSELoss()
     else:
         loss_fn = torch.nn.BCELoss()
+    metrics_fn = utils.find_metrics()
 
     start_epoch, best_loss = utils.load_checkpoint(
         encoder, decoder, args.resume)
@@ -83,18 +91,18 @@ def main(args):
 
     while epoch <= int(args.n_epochs):
         print("="*50)
-
+        utils.adjust_learning_rate(args.lr, optimizer, epoch)
         print("Epoch %d Training Starting" % epoch)
         print("Learning Rate : ", utils.get_lr(optimizer))
 
         train_loss = train.train(
-            train_loader, encoder, decoder, optimizer, loss_fn, epoch, writer, use_gpu)
+            train_loader, encoder, decoder, optimizer, loss_fn, metrics_fn, epoch, writer, use_gpu)
         val_loss = train.validate(
-            val_loader, encoder, decoder, loss_fn, epoch, writer, use_gpu)
+            val_loader, encoder, decoder, loss_fn, metrics_fn, epoch, writer, use_gpu)
 
         print("-"*50)
-        print("Training Loss: ", float(train_loss.data))
-        print("Validation Loss: ", float(val_loss.data))
+        print("Training Loss: ", float(train_loss))
+        print("Validation Loss: ", float(val_loss))
         print("="*50)
 
         curr_state = state = {
@@ -116,14 +124,15 @@ def main(args):
             best_loss = val_loss
 
         epoch += 1
+        writer.add_scalar('data/learning_rate', utils.get_lr(optimizer), epoch)
 
 
 if __name__ == "__main__":
     args = parser.parse_args()
     if socket.gethostname() == 'eru':
         _DATASET_PATH = '/home/deepandas11/computer/servers/euler/data/Data/DataSet13_20200221/raw_patient_based'
-    elif socket.gethostname() == 'euler.wacc.wisc.edu':
-        _DATASET_PATH = '/srv/home/deepandas11/bleeds/data/Data/DataSet13_20200221/raw_patient_based'
     else:
-        _DATASET_PATH = '/home/data/'
+        _DATASET_PATH = '/srv/home/deepandas11/bleeds/data/Data/DataSet13_20200221/raw_patient_based'
+    # else:
+    #     _DATASET_PATH = '/home/data/'
     main(args)

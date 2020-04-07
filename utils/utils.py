@@ -1,6 +1,7 @@
 import torch
 import os
 import shutil
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 
 class AverageMeter(object):
     def __init__(self):
@@ -21,12 +22,30 @@ class AverageMeter(object):
         self.avg = self.sum/self.count
 
 
-def adjust_learning_rate(base_lr, lr_decay, optimizer, epoch):
-    # Sets the learning rate to the initial LR decayed by 10 every lr_decay epochs
-    lr = base_lr * (0.1 ** (epoch // lr_decay))
+def adjust_learning_rate(base_lr, optimizer, epoch, lr_decay=0.2):
+    """Adjusts learning rate based on epoch of training
 
+    At 60th, 120th and 150th epoch, divide learning rate by 0.2
+
+    Args:
+        base_lr: starting learning rate
+        optimizer: optimizer used in training, SGD usually
+        epoch: current epoch
+        lr_decay: decay ratio (default: {0.2})
+    """
+    if epoch < 30:
+        lr = base_lr
+    elif 30 <= epoch < 70:
+        lr = base_lr * 0.2
+    elif 70 <= epoch < 150:
+        lr = base_lr * (0.2)**2
+    else:
+        lr = base_lr * (0.2)**3
+
+    # lr = base_lr * (0.1 ** (epoch // lr_decay))
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
+
 
 
 def get_lr(optimizer):
@@ -75,3 +94,20 @@ def load_checkpoint(encoder, decoder, resume_filename):
 
     return start_epoch, best_loss
   
+
+def find_metrics(outputs, labels, thresh=0.5):
+    """
+    Compute the accuracy, given the outputs and labels for all images.
+
+    Returns: (float) accuracy in [0,1]
+    """
+    outputs = outputs.detach().numpy()
+    labels = labels.detach().numpy()
+
+    labels[labels>=thresh] = 1.0
+    labels[labels<thresh] = 0.0
+
+    acc_score = accuracy_score(label_batch, preds)
+    prec, rec, _, _ = precision_recall_fscore_support(label_batch, preds)
+
+    return acc_score, prec, rec
