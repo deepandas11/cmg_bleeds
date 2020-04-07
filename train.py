@@ -1,107 +1,78 @@
 import time
 import torch
-# import numpy as np
-# import math
-# from statistics import mean
-# import torch.utils.data as data
-from tensorboardX import SummaryWriter
 from torch.autograd import Variable
-
-writer = SummaryWriter('logs/')
-
 from utils.utils import AverageMeter
 
 
-_mse_loss = torch.nn.MSELoss()
-_criterion = torch.nn.BCELoss()  
 
-def train(data_loader_train, encoder, decoder, optimizer, epoch,
-          use_gpu=False, start_loss=0.0):
+
+def train(data_loader, encoder, decoder, optimizer, loss_fn, epoch, writer,
+          use_gpu=False):
+
+    encoder.train()
+    decoder.train()
 
     losses = AverageMeter()
-    total_loss = start_loss
+    epoch_steps = len(data_loader)
 
-    # Randomly Shuffled Dataset Indices
-    indices = data_loader_train.get_indices()
-    total_steps = len(indices)
-    # total_steps = 5
+    for i, (train_batch, label_batch) in enumerate(data_loader):
+        niter = (epoch - 1)*epoch_steps + i
 
-    # Training with Batch Size 1
-    for index in range(total_steps):
-        # Fetch actual data index
-        d_index = indices[index]
+        if use_gpu:
+            train_batch, label_batch = train_batch.cuda(), label_batch.cuda()
 
-        encoder.train()
-        decoder.train()
 
-        img_sequence, label = data_loader_train[d_index]
+        train_batch, label_batch = map(Variable, (train_batch, label_batch))
+        output_batch = encoder(train_batch)
+        output_batch = decoder(output_batch)
 
-        if torch.cuda.is_available() and use_gpu:
-            img_sequence = img_sequence.cuda()
-            label = label.cuda()
-
-        img_sequence, label = map(Variable, (img_sequence, label))
-
-        seq_op = encoder(img_sequence)
-        pred = decoder(seq_op)
-        # loss = _mse_loss(pred, label)
-        loss = _criterion(pred, label)
+        loss = loss_fn(output_batch, label_batch)
+        losses.update(loss.item())
+        writer.add_scalar('data/stepwise_training_loss', losses.val, niter)
 
         optimizer.zero_grad()
-        total_loss += loss.data
         loss.backward()
         optimizer.step()
-        # print("000000", loss, loss.shape)
-        losses.update(loss.item())
-        niter = epoch * total_steps + index
-        writer.add_scalar('data/training_loss', losses.val, niter)
 
         print("Step: %d, Current Loss: %0.4f, Average Loss: %0.4f" %
-              (index, loss, total_loss))
+              (i, loss, losses.avg))
 
-    return total_loss/total_steps
+    writer.add_scalar('data/training_loss', losses.avg, epoch)
+    return losses.avg
 
 
 
-def validate(encoder, decoder, data_loader_val, epoch, use_gpu):
+def validate(data_loader, encoder, decoder, loss_fn, epoch, writer, use_gpu=False):
 
-    val_losses = AverageMeter()
-    total_val_loss = 0.0
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    encoder = encoder.to(device)
-    decoder = decoder.to(device)
     encoder.eval()
     decoder.eval()
 
-    indices = data_loader_val.get_indices()
-    total_steps = len(indices)
-    # total_steps = 5
+    losses = AverageMeter()
+    epoch_steps = len(data_loader)
 
-    # Loss Scores Record
-    loss_scores = list()
-    for index in range(total_steps):
-        d_index = indices[index]
+    for i, (train_batch, label_batch) in enumerate(data_loader):
+        niter = (epoch - 1)*epoch_steps + i
 
-        img_sequence, label = data_loader_val[d_index]
+        if use_gpu:
+            train_batch, label_batch = train_batch.cuda(), label_batch.cuda()
 
-        img_sequence = img_sequence.to(device)
-        label = label.to(device)
-        
         with torch.no_grad():
-            seq_op = encoder(img_sequence)
-            pred = decoder(seq_op)
+            train_batch, label_batch = map(Variable, (train_batch, label_batch))
+            output_batch = encoder(train_batch)
+            output_batch = decoder(output_batch)    
 
-            loss = _mse_loss(pred, label)
-            loss_scores.append(loss)
-            total_val_loss += loss.data
+            loss = loss_fn(output_batch, label_batch)
+            losses.update(loss.item())
+            
+            writer.add_scalar('data/stepwise_val_loss', losses.val, niter)
 
-        val_losses.update(loss.item())
-        niter =  epoch * total_steps + index
-        writer.add_scalar('data/validation_loss', val_losses.val, niter)
 
-    return total_val_loss / total_steps
+        print("Step: %d, Current Loss: %0.4f, Average Loss: %0.4f" %
+              (i, loss, losses.avg))
+
+    writer.add_scalar('data/val_loss', losses.avg, epoch)
+    return losses.avg
+
 
 
 

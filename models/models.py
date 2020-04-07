@@ -21,26 +21,25 @@ class EncoderCNN(nn.Module):
         modules.append(nn.ReLU())
         self.pretrained_model.classifier = nn.Sequential(*modules)
 
-    def forward(self, x_3d):
-        cnn_embed_seq = []
-        for frame_num in range(x_3d.size(0)):
-            img_consider = x_3d[frame_num, :, :, :].unsqueeze(0)
-            x = self.pretrained_model(img_consider)
-            x = x.view(x.shape[1])
-            cnn_embed_seq.append(x)
+    def forward(self, x):
+        orig_shape = x.shape[:2]
+        img_shape = x.shape[-3:]
 
-        cnn_embed_seq = torch.stack(cnn_embed_seq, dim=0)
-        return cnn_embed_seq
+        x = x.view(-1, *img_shape)
+        x = self.pretrained_model(x)
+        x = x.view(*orig_shape, -1)
+        return x
 
 
-class DecoderRNN(nn.Module):
+class DecoderLSTM(nn.Module):
     def __init__(
         self,
-        encoding_dim=2048,
-        hidden_features=1024,
-        intermediate_features=128
+        encoding_dim=38,
+        hidden_features=1,
+        intermediate_features=128,
+        feature_size=2048,
     ):
-        super(DecoderRNN, self).__init__()
+        super(DecoderLSTM, self).__init__()
         self.LSTM_input_size = encoding_dim
         self.hidden_features = hidden_features
 
@@ -49,22 +48,15 @@ class DecoderRNN(nn.Module):
             hidden_size=self.hidden_features
         )
         self.classifier = nn.Sequential(
-            nn.Linear(self.hidden_features, intermediate_features),
+            nn.Linear(feature_size, intermediate_features),
             nn.ReLU(),
             nn.Linear(intermediate_features, 1),
             nn.Sigmoid())
 
     def forward(self, x_seq):
-        print(x_seq.shape)
-        x_seq = x_seq.unsqueeze(1)
         self.LSTM.flatten_parameters()
+        x_seq = x_seq.permute(0, 2, 1)
         x, (h_n, h_c) = self.LSTM(x_seq, None)
-        print(x.shape)
-        x = self.classifier(x[-1, :, :])
-
-        # x = self.fc1(LSTM_out[-1, :, :])
-        # x = F.relu(x)
-        # x = F.dropout(x)
-        # x = self.fc2(x)
-        # x = F.sigmoid(x)
+        x = x.view(x.shape[0], -1)
+        x = self.classifier(x)
         return x
