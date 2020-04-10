@@ -19,12 +19,12 @@ parser = argparse.ArgumentParser(
 parser.add_argument('--lr', default=0.1, type=float)
 parser.add_argument('--n_epochs', default=100)
 parser.add_argument('--batch_size', default=8)
-parser.add_argument('--gpu', default=False)
+parser.add_argument('--gpu', default=True)
 parser.add_argument('--resume', default='')
 parser.add_argument('--loss_fn', default='bce')
-parser.add_argument('--upsample', default=True)
-parser.add_argument('--pretrained', default=True)
-parser.add_argument('--name', default="upsample_pretrained")
+parser.add_argument('--upsample', default=False)
+parser.add_argument('--pretrained', default=False)
+parser.add_argument('--name', default="baseline")
 
 
 def main(args):
