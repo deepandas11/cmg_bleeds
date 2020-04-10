@@ -95,12 +95,17 @@ def load_checkpoint(encoder, decoder, resume_filename):
     return start_epoch, best_loss
 
 
-def find_metrics(outputs, labels, thresh=0.5, pos_label=1):
+def find_metrics(outputs, labels, thresh=0.5, pos_label=1, use_gpu=False):
     """
     Compute the accuracy, given the outputs and labels for all images.
 
     Returns: (float) accuracy in [0,1]
     """
+
+    if use_gpu:
+        outputs = outputs.cpu()
+        labels = labels.cpu()
+        
     outputs = outputs.detach().numpy()
     labels = labels.detach().numpy()
 
