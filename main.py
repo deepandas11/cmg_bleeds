@@ -43,7 +43,7 @@ def main(args):
     encoder = EncoderCNN(pretrained=args.pretrained)
     decoder = DecoderLSTM()
 
-    if args.gpu:
+    if use_gpu:
         cudnn.benchmark = True
         encoder = encoder.cuda()
         decoder = decoder.cuda()
