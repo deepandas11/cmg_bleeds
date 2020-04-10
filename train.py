@@ -34,7 +34,7 @@ def train(data_loader, encoder, decoder, optimizer, loss_fn, metrics_fn, epoch, 
         loss.backward()
         optimizer.step()
 
-        acc_score, prec, rec = metrics_fn(output_batch, label_batch)
+        acc_score, _, _ = metrics_fn(output_batch, label_batch)
         accuracies.update(acc_score)
 
         writer.add_scalar('data/stepwise_training_loss', losses.val, niter)
@@ -61,6 +61,7 @@ def validate(data_loader, encoder, decoder, loss_fn, metrics_fn, epoch, writer, 
     bleeding_recs = AverageMeter()
     healthy_precs = AverageMeter()
     healthy_recs = AverageMeter()
+    
 
     epoch_steps = len(data_loader)
 
@@ -78,20 +79,23 @@ def validate(data_loader, encoder, decoder, loss_fn, metrics_fn, epoch, writer, 
             loss = loss_fn(output_batch, label_batch)
             losses.update(loss.item())
 
-            acc_score, prec, rec = metrics_fn(output_batch, label_batch)
-
+            acc_score, prec, rec = metrics_fn(output_batch, label_batch, pos_label=1)
             accuracies.update(acc_score)
-            healthy_precs.update(prec[0])
-            healthy_recs.update(rec[0])
-            bleeding_precs.update(prec[1])
-            bleeding_recs.update(prec[0])
 
+            acc_score, prec_h, rec_h = metrics_fn(output_batch, label_batch, pos_label=0)
+
+            bleeding_precs.update(float(prec))
+            bleeding_recs.update(float(rec))
+            healthy_precs.update(float(prec_h))
+            healthy_recs.update(float(rec_h))
 
             writer.add_scalar('data/stepwise_val_loss', losses.val, niter)
 
 
         print("Step: %d, Current Loss: %0.4f, Average Loss: %0.4f" %
               (i, loss, losses.avg))
+
+
 
     writer.add_scalar('data/val_loss', losses.avg, epoch)
     writer.add_scalar('data/val_accuracy', accuracies.avg, epoch)

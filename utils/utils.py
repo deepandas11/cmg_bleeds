@@ -3,6 +3,7 @@ import os
 import shutil
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 
+
 class AverageMeter(object):
     def __init__(self):
         self.reset()
@@ -45,7 +46,6 @@ def adjust_learning_rate(base_lr, optimizer, epoch, lr_decay=0.2):
     # lr = base_lr * (0.1 ** (epoch // lr_decay))
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
-
 
 
 def get_lr(optimizer):
@@ -93,9 +93,9 @@ def load_checkpoint(encoder, decoder, resume_filename):
             print(" => No checkpoint found at '{}'".format(resume_filename))
 
     return start_epoch, best_loss
-  
 
-def find_metrics(outputs, labels, thresh=0.5):
+
+def find_metrics(outputs, labels, thresh=0.5, pos_label=1):
     """
     Compute the accuracy, given the outputs and labels for all images.
 
@@ -104,10 +104,10 @@ def find_metrics(outputs, labels, thresh=0.5):
     outputs = outputs.detach().numpy()
     labels = labels.detach().numpy()
 
-    labels[labels>=thresh] = 1.0
-    labels[labels<thresh] = 0.0
+    outputs[outputs >= thresh] = 1.0
+    outputs[outputs < thresh] = 0.0
 
-    acc_score = accuracy_score(label_batch, preds)
-    prec, rec, _, _ = precision_recall_fscore_support(label_batch, preds)
-
+    acc_score = accuracy_score(labels, outputs)
+    prec, rec, _, _ = precision_recall_fscore_support(
+        labels, outputs, average='binary', pos_label=pos_label)
     return acc_score, prec, rec

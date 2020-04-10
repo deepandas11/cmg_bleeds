@@ -23,8 +23,8 @@ parser.add_argument('--gpu', default=False)
 parser.add_argument('--resume', default='')
 parser.add_argument('--loss_fn', default='bce')
 parser.add_argument('--upsample', default=True)
-parser.add_argument('--pretrained', default=False)
-parser.add_argument('--name', default="upsample")
+parser.add_argument('--pretrained', default=True)
+parser.add_argument('--name', default="upsample_pretrained")
 
 
 def main(args):
@@ -83,7 +83,7 @@ def main(args):
         loss_fn = torch.nn.MSELoss()
     else:
         loss_fn = torch.nn.BCELoss()
-    metrics_fn = utils.find_metrics()
+    metrics_fn = utils.find_metrics
 
     start_epoch, best_loss = utils.load_checkpoint(
         encoder, decoder, args.resume)
@@ -95,8 +95,11 @@ def main(args):
         print("Epoch %d Training Starting" % epoch)
         print("Learning Rate : ", utils.get_lr(optimizer))
 
+        print("\n","-"*10, "Training","-"*10,"\n")
         train_loss = train.train(
             train_loader, encoder, decoder, optimizer, loss_fn, metrics_fn, epoch, writer, use_gpu)
+
+        print("\n","-"*10, "Validation","-"*10,"\n")
         val_loss = train.validate(
             val_loader, encoder, decoder, loss_fn, metrics_fn, epoch, writer, use_gpu)
 
