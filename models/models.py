@@ -4,7 +4,7 @@ import torchvision.models as imagemodels
 
 
 class EncoderCNN(nn.Module):
-    def __init__(self, pretrained=False, remove_layers=1, base_model='alexnet'):
+    def __init__(self, pretrained=False, remove_layers=1, base_model='resnet50'):
         """        
         Args:
             pretrained: Decide if pretrained on image-net needed
