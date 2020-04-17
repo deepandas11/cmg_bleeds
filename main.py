@@ -9,22 +9,25 @@ from tensorboardX import SummaryWriter
 
 from data.dataloader import BleedsDataset, get_loader
 from models.models import EncoderCNN, DecoderLSTM
-from utils import utils
+from utils import utils, cyclicLR
 import train
 
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-parser.add_argument('--lr', default=0.1, type=float)
+parser.add_argument('--lr', default=0.001, type=float)
+parser.add_argument('--lr_decay', default=0.1, type=float)
+parser.add_argument('--base_model', default='vgg19', type=str)
 parser.add_argument('--n_epochs', default=100)
-parser.add_argument('--batch_size', default=8)
+parser.add_argument('--batch_size', default=8, type=int)
 parser.add_argument('--gpu', default=True)
 parser.add_argument('--resume', default='')
 parser.add_argument('--loss_fn', default='bce')
-parser.add_argument('--upsample', default=False)
-parser.add_argument('--pretrained', default=False)
-parser.add_argument('--name', default="baseline")
+parser.add_argument('--upsample', default=True)
+parser.add_argument('--pretrained', default=True)
+parser.add_argument('--name', default="vgg19_upsampled_pretraining")
+parser.add_argument('--cyclic_lr', default=True)
 
 
 def main(args):
@@ -40,7 +43,7 @@ def main(args):
     if not torch.cuda.is_available():
         use_gpu = False
 
-    encoder = EncoderCNN(pretrained=args.pretrained)
+    encoder = EncoderCNN(pretrained=args.pretrained, base_model=args.base_model)
     decoder = DecoderLSTM()
 
     if use_gpu:
@@ -77,7 +80,9 @@ def main(args):
     decoder_trainables = [p for p in decoder.parameters() if p.requires_grad]
 
     params = encoder_trainables + decoder_trainables
-    optimizer = torch.optim.SGD(params=params, lr=args.lr, momentum=0.9)
+    optimizer = torch.optim.Adam(params=params, lr=args.lr, betas=(0.9, 0.999), eps=1e-08)
+    scheduler = cyclicLR.CyclicCosAnnealingLR(optimizer, milestones=[30,60,90])
+    # optimizer = torch.optim.SGD(params=params, lr=args.lr, momentum=0.9)
 
     if args.loss_fn == 'mse':
         loss_fn = torch.nn.MSELoss()
@@ -91,7 +96,10 @@ def main(args):
 
     while epoch <= int(args.n_epochs):
         print("="*50)
-        utils.adjust_learning_rate(args.lr, optimizer, epoch)
+        if args.cyclic_lr:
+            scheduler.step()
+        else:
+            utils.adjust_learning_rate(args.lr, optimizer, epoch, args.lr_decay)
         print("Epoch %d Training Starting" % epoch)
         print("Learning Rate : ", utils.get_lr(optimizer))
 
