@@ -110,27 +110,3 @@ class CyclicLinearLR(_LRScheduler):
                (1. - 1.0*curr_pos/ width)
                 for base_lr in self.base_lrs]
 
-'''
-#################################
-# TEST FOR SCHEDULER
-#################################
-import matplotlib.pyplot as plt
-import torch.nn as nn
-import torch.optim as optim
-
-net = nn.Sequential(nn.Linear(2,2))
-milestones = [(2**x)*300 for x in range(30)]
-optimizer = optim.SGD(net.parameters(),lr=1e-3,momentum=0.9,weight_decay=0.0005,nesterov=True)
-scheduler = CyclicCosAnnealingLR(optimizer,milestones=milestones,eta_min=1e-6)
-
-lr_log = []
-
-for i in range(20*300):
-    optimizer.step()
-    scheduler.step()
-    for param_group in optimizer.param_groups:
-        lr_log.append(param_group['lr'])
-
-plt.plot(lr_log)
-plt.show()
-'''

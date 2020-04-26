@@ -1,8 +1,9 @@
 import torch
 import os
 import shutil
+import numpy as np
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
-
+import torch.nn as nn
 
 class AverageMeter(object):
     def __init__(self):
@@ -94,25 +95,48 @@ def load_checkpoint(encoder, decoder, resume_filename):
 
     return start_epoch, best_loss
 
+def loss_fn(outputs, labels):
+    """
+    Compute the cross entropy loss given outputs and labels.
 
-def find_metrics(outputs, labels, thresh=0.5, pos_label=1, use_gpu=False):
+    Returns:
+        loss (Variable): cross entropy loss for all images in the batch
+
+    Note: you may use a standard loss function from http://pytorch.org/docs/master/nn.html#loss-functions. This example
+          demonstrates how you can easily define a custom loss function.
+    """
+    return nn.CrossEntropyLoss()(outputs, labels)
+
+
+
+def check_type(outputs, labels, use_gpu):
+    if type(outputs) is not np.ndarray:
+        if use_gpu:
+            outputs = outputs.cpu()
+        outputs = outputs.detach().numpy()
+
+    if type(labels) is not np.ndarray:
+        if use_gpu:
+            labels = labels.cpu()
+        labels = labels.detach().numpy()
+
+    outputs = np.argmax(outputs, axis=1)
+    return outputs, labels
+
+
+
+def find_metrics(outputs, labels, use_gpu=False):
     """
     Compute the accuracy, given the outputs and labels for all images.
 
     Returns: (float) accuracy in [0,1]
     """
 
-    if use_gpu:
-        outputs = outputs.cpu()
-        labels = labels.cpu()
-        
-    outputs = outputs.detach().numpy()
-    labels = labels.detach().numpy()
+    outputs, labels = check_type(outputs, labels, use_gpu)
 
-    outputs[outputs >= thresh] = 1.0
-    outputs[outputs < thresh] = 0.0
+    accuracy = np.sum(outputs == labels) / float(outputs.size)
 
-    acc_score = accuracy_score(labels, outputs)
     prec, rec, _, _ = precision_recall_fscore_support(
-        labels, outputs, average='binary', pos_label=pos_label)
-    return acc_score, prec, rec
+        labels, outputs, average='weighted')
+
+    return accuracy, prec, rec

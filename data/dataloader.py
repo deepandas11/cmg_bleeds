@@ -59,7 +59,9 @@ class BleedsDataset(Dataset):
                 [zero_img] * (self.seq_length - len(image_stack)))
 
         image_stack = torch.stack(image_stack, dim=0)
-        label = torch.Tensor([label])
+        label = torch.Tensor([label]).long()
+        label = label.squeeze(-1)
+
 
         return image_stack, label
 

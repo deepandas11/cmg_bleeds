@@ -8,26 +8,26 @@ import torch.backends.cudnn as cudnn
 from tensorboardX import SummaryWriter
 
 from data.dataloader import BleedsDataset, get_loader
-from models.models import EncoderCNN, DecoderLSTM
+from models.models import EncoderCNN, DecoderLSTM, Aggregator
 from utils import utils, cyclicLR
 import train
 
 from functools import partial
+from pprint import pprint
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 parser.add_argument('--lr', default=0.00001, type=float)
 parser.add_argument('--lr_decay', default=0.1, type=float)
-parser.add_argument('--base_model', default='alexnet', type=str)
+parser.add_argument('--base_model', default='resnet34', type=str)
 parser.add_argument('--n_epochs', default=100)
-parser.add_argument('--batch_size', default=16, type=int)
+parser.add_argument('--batch_size', default=8, type=int)
 parser.add_argument('--gpu', default=True)
 parser.add_argument('--resume', default='')
-parser.add_argument('--loss_fn', default='bce')
 parser.add_argument('--upsample', default=True)
 parser.add_argument('--pretrained', default=True)
-parser.add_argument('--name', default="vgg19_pretrained_bsize16_cyclicLR")
+parser.add_argument('--name', default="resnet34_cyclicLR_pretrained")
 parser.add_argument('--cyclic_lr', default=True)
 
 
@@ -44,21 +44,14 @@ def main(args):
     if not torch.cuda.is_available():
         use_gpu = False
 
-    encoder = EncoderCNN(pretrained=args.pretrained, base_model=args.base_model)
-    decoder = DecoderLSTM()
-
-    if use_gpu:
-        cudnn.benchmark = True
-        encoder = encoder.cuda()
-        decoder = decoder.cuda()
 
     transform = transforms.Compose([
         # transforms.RandomCrop(32, padding=4),
         transforms.Resize((224, 224)),
-        transforms.RandomHorizontalFlip(),
+        # transforms.RandomHorizontalFlip(),
         transforms.RandomRotation(30),
         # transforms.RandomPerspective(),
-        transforms.ColorJitter(),
+        # transforms.ColorJitter(),
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261))])
 
@@ -68,7 +61,7 @@ def main(args):
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261))])
 
     train_dataset = BleedsDataset(
-        transform=transform, mode="train", dataset_path=_DATASET_PATH, batch_size=8, upsample=args.upsample)
+        transform=transform, mode="train", dataset_path=_DATASET_PATH, batch_size=args.batch_size, upsample=args.upsample)
     val_dataset = BleedsDataset(transform=val_transform,
                                 mode="val", dataset_path=_DATASET_PATH)
 
@@ -76,6 +69,18 @@ def main(args):
         train_dataset, batch_size=args.batch_size, shuffle=True)
     val_loader = get_loader(
         val_dataset, batch_size=args.batch_size, shuffle=False)
+
+    print("Loaded datasets now loading models")
+
+    encoder = EncoderCNN(pretrained=args.pretrained, base_model=args.base_model)
+    # decoder = DecoderLSTM()
+    decoder = Aggregator()
+
+    if use_gpu:
+        cudnn.benchmark = True
+        encoder = encoder.cuda()
+        decoder = decoder.cuda()
+
 
     encoder_trainables = [p for p in encoder.parameters() if p.requires_grad]
     decoder_trainables = [p for p in decoder.parameters() if p.requires_grad]
@@ -87,10 +92,7 @@ def main(args):
         scheduler = cyclicLR.CyclicCosAnnealingLR(optimizer, milestones=[30,50], eta_min=1e-7)
 
 
-    if args.loss_fn == 'mse':
-        loss_fn = torch.nn.MSELoss()
-    else:
-        loss_fn = torch.nn.BCELoss()
+    loss_fn = utils.loss_fn
     metrics_fn = utils.find_metrics
 
     start_epoch, best_loss = utils.load_checkpoint(
@@ -103,6 +105,7 @@ def main(args):
             scheduler.step()
         else:
             utils.adjust_learning_rate(args.lr, optimizer, epoch, args.lr_decay)
+        
         print("Epoch %d Training Starting" % epoch)
         print("Learning Rate : ", utils.get_lr(optimizer))
 
@@ -144,7 +147,7 @@ def main(args):
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    print(args.__dict__)
+    pprint(args.__dict__)
     print = partial(print, flush=True)
     if socket.gethostname() == 'eru':
         _DATASET_PATH = '/home/deepandas11/computer/servers/euler/data/Data/DataSet13_20200221/raw_patient_based'
