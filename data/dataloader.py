@@ -49,18 +49,21 @@ class BleedsDataset(Dataset):
         image_stack = []
         label = id_data["seq_label"]
 
+        # print("get item")
+        # print(id_data)
+
         if label == 1 and self.mode == "train":
             bbox = id_data["bbox"]
-            x1 = bbox["left"]
-            x2 = bbox["right"]
-            y1 = bbox["upper"]
-            y2 = bbox["lower"]
+            x1 = round(float(bbox["left"]))
+            x2 = round(float(bbox["right"]))
+            y1 = round(float(bbox["upper"]))
+            y2 = round(float(bbox["lower"]))
 
         for frame in id_data["sequence"]:
             image_path = self.data_path + id_data["sequence"][frame]
             image = Image.open(image_path).convert("RGB")
             if label == 1 and self.mode == "train":
-                image = image[:,:, y1, y2, x1, x2]
+                image.crop((x1, y1, x2, y2))
             image = self.transform(image)
             image_stack.append(image)
 
