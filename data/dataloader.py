@@ -22,6 +22,7 @@ class BleedsDataset(Dataset):
         pad_sequence=True,
         mode="train",
     ):
+        self.mode = mode
         if mode == 'train':
             self.data_path = os.path.join(dataset_path, "Training")
             self.meta_path = os.path.join(dataset_path, 'train_meta.json')
@@ -48,9 +49,18 @@ class BleedsDataset(Dataset):
         image_stack = []
         label = id_data["seq_label"]
 
+        if label == 1 and self.mode == "train":
+            bbox = id_data["bbox"]
+            x1 = bbox["left"]
+            x2 = bbox["right"]
+            y1 = bbox["upper"]
+            y2 = bbox["lower"]
+
         for frame in id_data["sequence"]:
             image_path = self.data_path + id_data["sequence"][frame]
             image = Image.open(image_path).convert("RGB")
+            if label == 1 and self.mode == "train":
+                image = image[:,:, y1, y2, x1, x2]
             image = self.transform(image)
             image_stack.append(image)
 
