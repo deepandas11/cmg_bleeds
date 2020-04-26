@@ -12,21 +12,22 @@ from models.models import EncoderCNN, DecoderLSTM
 from utils import utils, cyclicLR
 import train
 
+from functools import partial
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-parser.add_argument('--lr', default=0.001, type=float)
+parser.add_argument('--lr', default=0.00001, type=float)
 parser.add_argument('--lr_decay', default=0.1, type=float)
-parser.add_argument('--base_model', default='vgg19', type=str)
+parser.add_argument('--base_model', default='alexnet', type=str)
 parser.add_argument('--n_epochs', default=100)
-parser.add_argument('--batch_size', default=8, type=int)
+parser.add_argument('--batch_size', default=16, type=int)
 parser.add_argument('--gpu', default=True)
 parser.add_argument('--resume', default='')
 parser.add_argument('--loss_fn', default='bce')
 parser.add_argument('--upsample', default=True)
 parser.add_argument('--pretrained', default=True)
-parser.add_argument('--name', default="vgg19_upsampled_pretraining")
+parser.add_argument('--name', default="vgg19_pretrained_bsize16_cyclicLR")
 parser.add_argument('--cyclic_lr', default=True)
 
 
@@ -80,9 +81,11 @@ def main(args):
     decoder_trainables = [p for p in decoder.parameters() if p.requires_grad]
 
     params = encoder_trainables + decoder_trainables
-    optimizer = torch.optim.Adam(params=params, lr=args.lr, betas=(0.9, 0.999), eps=1e-08)
-    scheduler = cyclicLR.CyclicCosAnnealingLR(optimizer, milestones=[30,60,90])
-    # optimizer = torch.optim.SGD(params=params, lr=args.lr, momentum=0.9)
+    optimizer = torch.optim.SGD(params=params, lr=args.lr, momentum=0.9)
+    # optimizer = torch.optim.Adam(params=params, lr=args.lr, betas=(0.9, 0.999), eps=1e-08)
+    if args.cyclic_lr:
+        scheduler = cyclicLR.CyclicCosAnnealingLR(optimizer, milestones=[30,50], eta_min=1e-7)
+
 
     if args.loss_fn == 'mse':
         loss_fn = torch.nn.MSELoss()
@@ -136,10 +139,13 @@ def main(args):
 
         epoch += 1
         writer.add_scalar('data/learning_rate', utils.get_lr(optimizer), epoch)
+        print(utils.get_lr(optimizer))
 
 
 if __name__ == "__main__":
     args = parser.parse_args()
+    print(args.__dict__)
+    print = partial(print, flush=True)
     if socket.gethostname() == 'eru':
         _DATASET_PATH = '/home/deepandas11/computer/servers/euler/data/Data/DataSet13_20200221/raw_patient_based'
     else:
