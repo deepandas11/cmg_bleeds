@@ -169,9 +169,11 @@ if __name__ == "__main__":
     pprint(args.__dict__)
     print = partial(print, flush=True)
     if socket.gethostname() == 'eru':
+        # _DATASET_PATH = '/home/deepandas11/computer/servers/euler/data/Data/DataSet13_20200221/raw_patient_based'
         _DATASET_PATH = '/home/deepandas11/computer/servers/euler/data/Data/DataSet13_20200221/raw_patient_based'
     else:
-        _DATASET_PATH = '/srv/home/deepandas11/bleeds/data/Data/DataSet13_20200221/raw_patient_based'
+        # _DATASET_PATH = '/srv/home/deepandas11/bleeds/data/Data/DataSet13_20200221/raw_patient_based'
+        _DATASET_PATH = '/Users/hcao/Projects/Research/cmg_bleeds/data/Data/DataSet13_20200221/raw_patient_based'
     # else:
     #     _DATASET_PATH = '/home/data/'
     main(args)
