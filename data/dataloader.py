@@ -25,9 +25,13 @@ class BleedsDataset(Dataset):
         if mode == 'train':
             self.data_path = os.path.join(dataset_path, "Training")
             self.meta_path = os.path.join(dataset_path, 'train_meta.json')
-        else:
+        elif mode == 'test':
             self.data_path = os.path.join(dataset_path, "Testing")
             self.meta_path = os.path.join(dataset_path, 'test_meta.json')
+        else:
+            self.data_path = os.path.join(dataset_path, "Training")
+            self.meta_path = os.path.join(dataset_path, 'val_meta.json')
+
         self.meta_data = json.load(open(self.meta_path, 'r'))
         self.indexes = list(self.meta_data.keys())
         self.transform = transform
@@ -59,8 +63,8 @@ class BleedsDataset(Dataset):
                 [zero_img] * (self.seq_length - len(image_stack)))
 
         image_stack = torch.stack(image_stack, dim=0)
-        label = torch.Tensor([label]).long()
-        label = label.squeeze(-1)
+        label = torch.Tensor([label])
+        # label = label.squeeze(-1)
 
 
         return image_stack, label

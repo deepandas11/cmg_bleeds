@@ -18,7 +18,7 @@ from pprint import pprint
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-parser.add_argument('--lr', default=0.00001, type=float)
+parser.add_argument('--lr', default=0.0001, type=float)
 parser.add_argument('--lr_decay', default=0.1, type=float)
 parser.add_argument('--base_model', default='resnet34', type=str)
 parser.add_argument('--n_epochs', default=100)
@@ -27,8 +27,11 @@ parser.add_argument('--gpu', default=True)
 parser.add_argument('--resume', default='')
 parser.add_argument('--upsample', default=True)
 parser.add_argument('--pretrained', default=True)
-parser.add_argument('--name', default="resnet34_cyclicLR_pretrained")
+parser.add_argument('--name', default="resnet34_cyclicLR_maxpool_validation")
 parser.add_argument('--cyclic_lr', default=True)
+parser.add_argument('--seq_model', default=False)
+parser.add_argument('--max_aggregate', default=True)
+parser.add_argument('--test_epoch', default=2)
 
 
 def main(args):
@@ -44,43 +47,52 @@ def main(args):
     if not torch.cuda.is_available():
         use_gpu = False
 
-
     transform = transforms.Compose([
         # transforms.RandomCrop(32, padding=4),
+        transforms.CenterCrop(900),
         transforms.Resize((224, 224)),
         # transforms.RandomHorizontalFlip(),
-        transforms.RandomRotation(30),
+        # transforms.RandomRotation(30),
         # transforms.RandomPerspective(),
         # transforms.ColorJitter(),
         transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261))])
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
     val_transform = transforms.Compose([
+        transforms.CenterCrop(500),
         transforms.Resize((224, 224)),
         transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261))])
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
     train_dataset = BleedsDataset(
-        transform=transform, mode="train", dataset_path=_DATASET_PATH, batch_size=args.batch_size, upsample=args.upsample)
+        transform=transform, mode="train", dataset_path=_DATASET_PATH,
+        batch_size=args.batch_size, upsample=args.upsample)
     val_dataset = BleedsDataset(transform=val_transform,
                                 mode="val", dataset_path=_DATASET_PATH)
+    test_dataset = BleedsDataset(transform=val_transform,
+                                 mode="test", dataset_path=_DATASET_PATH)
 
     train_loader = get_loader(
         train_dataset, batch_size=args.batch_size, shuffle=True)
     val_loader = get_loader(
-        val_dataset, batch_size=args.batch_size, shuffle=False)
+        val_dataset, batch_size=args.batch_size, shuffle=True)
+    test_loader = get_loader(
+        test_dataset, batch_size=args.batch_size, shuffle=True)
 
     print("Loaded datasets now loading models")
 
-    encoder = EncoderCNN(pretrained=args.pretrained, base_model=args.base_model)
-    # decoder = DecoderLSTM()
-    decoder = Aggregator()
+    encoder = EncoderCNN(pretrained=args.pretrained,
+                         base_model=args.base_model)
+
+    if args.seq_model:
+        decoder = DecoderLSTM()
+    else:
+        decoder = Aggregator(max_aggregate=args.max_aggregate)
 
     if use_gpu:
         cudnn.benchmark = True
         encoder = encoder.cuda()
         decoder = decoder.cuda()
-
 
     encoder_trainables = [p for p in encoder.parameters() if p.requires_grad]
     decoder_trainables = [p for p in decoder.parameters() if p.requires_grad]
@@ -89,10 +101,10 @@ def main(args):
     optimizer = torch.optim.SGD(params=params, lr=args.lr, momentum=0.9)
     # optimizer = torch.optim.Adam(params=params, lr=args.lr, betas=(0.9, 0.999), eps=1e-08)
     if args.cyclic_lr:
-        scheduler = cyclicLR.CyclicCosAnnealingLR(optimizer, milestones=[30,50], eta_min=1e-7)
+        scheduler = cyclicLR.CyclicCosAnnealingLR(
+            optimizer, milestones=[10, 20], eta_min=1e-7)
 
-
-    loss_fn = utils.loss_fn
+    loss_fn = torch.nn.BCELoss()
     metrics_fn = utils.find_metrics
 
     start_epoch, best_loss = utils.load_checkpoint(
@@ -104,22 +116,29 @@ def main(args):
         if args.cyclic_lr:
             scheduler.step()
         else:
-            utils.adjust_learning_rate(args.lr, optimizer, epoch, args.lr_decay)
-        
+            utils.adjust_learning_rate(
+                args.lr, optimizer, epoch, args.lr_decay)
+
         print("Epoch %d Training Starting" % epoch)
         print("Learning Rate : ", utils.get_lr(optimizer))
 
-        print("\n","-"*10, "Training","-"*10,"\n")
+        print("\n", "-"*10, "Training", "-"*10, "\n")
         train_loss = train.train(
             train_loader, encoder, decoder, optimizer, loss_fn, metrics_fn, epoch, writer, use_gpu)
 
-        print("\n","-"*10, "Validation","-"*10,"\n")
+        print("\n", "-"*10, "Validation", "-"*10, "\n")
         val_loss = train.validate(
-            val_loader, encoder, decoder, loss_fn, metrics_fn, epoch, writer, use_gpu)
+            val_loader, encoder, decoder, loss_fn, metrics_fn, epoch, writer, use_gpu, ver="validation")
 
         print("-"*50)
         print("Training Loss: ", float(train_loss))
         print("Validation Loss: ", float(val_loss))
+
+        if epoch % args.test_epoch == 0:
+            test_loss = train.validate(
+                test_loader, encoder, decoder, loss_fn, metrics_fn, epoch, writer, use_gpu, ver="val")
+
+            print("Test Set Loss Loss: ", float(test_loss))
         print("="*50)
 
         curr_state = state = {

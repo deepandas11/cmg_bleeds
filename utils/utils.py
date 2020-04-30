@@ -5,6 +5,7 @@ import numpy as np
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 import torch.nn as nn
 
+
 class AverageMeter(object):
     def __init__(self):
         self.reset()
@@ -79,8 +80,10 @@ def load_checkpoint(encoder, decoder, resume_filename):
             checkpoint = torch.load(resume_filename)
             start_epoch = checkpoint['epoch']
             best_loss = checkpoint['best_loss']
-            encoder.load_state_dict(checkpoint['encoder'])
-            decoder.load_state_dict(checkpoint['decoder'])
+            if encoder is not None:
+                encoder.load_state_dict(checkpoint['encoder'])
+            if decoder is not None:
+                decoder.load_state_dict(checkpoint['decoder'])
 
             print("========================================================")
 
@@ -95,6 +98,7 @@ def load_checkpoint(encoder, decoder, resume_filename):
 
     return start_epoch, best_loss
 
+
 def loss_fn(outputs, labels):
     """
     Compute the cross entropy loss given outputs and labels.
@@ -108,7 +112,6 @@ def loss_fn(outputs, labels):
     return nn.CrossEntropyLoss()(outputs, labels)
 
 
-
 def check_type(outputs, labels, use_gpu):
     if type(outputs) is not np.ndarray:
         if use_gpu:
@@ -120,12 +123,11 @@ def check_type(outputs, labels, use_gpu):
             labels = labels.cpu()
         labels = labels.detach().numpy()
 
-    outputs = np.argmax(outputs, axis=1)
+    # outputs = np.argmax(outputs, axis=1)
     return outputs, labels
 
 
-
-def find_metrics(outputs, labels, use_gpu=False):
+def find_metrics(outputs, labels, thresh=0.3, pos_label=1, use_gpu=False):
     """
     Compute the accuracy, given the outputs and labels for all images.
 
@@ -134,9 +136,14 @@ def find_metrics(outputs, labels, use_gpu=False):
 
     outputs, labels = check_type(outputs, labels, use_gpu)
 
-    accuracy = np.sum(outputs == labels) / float(outputs.size)
+    outputs[outputs >= thresh] = 1.0
+    outputs[outputs < thresh] = 0.0
 
+    # accuracy = np.sum(outputs == labels) / float(outputs.size)
+    # prec, rec, _, _ = precision_recall_fscore_support(
+    #     labels, outputs, average='weighted')
+
+    accuracy = accuracy_score(labels, outputs)
     prec, rec, _, _ = precision_recall_fscore_support(
-        labels, outputs, average='weighted')
-
+        labels, outputs, average='binary', pos_label=pos_label)
     return accuracy, prec, rec
